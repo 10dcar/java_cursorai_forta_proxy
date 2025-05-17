@@ -36,7 +36,7 @@ public class JsonRpcProxy {
     // Cache configuration: 1000 entries, 5 minutes expiration
     private static final Cache<String, String> responseCache = Caffeine.newBuilder()
             .maximumSize(1000)
-            .expireAfterWrite(Duration.ofMinutes(5))
+            .expireAfterWrite(Duration.ofSeconds(1))
             .build();
 
     public static void main(String[] args) throws IOException {
