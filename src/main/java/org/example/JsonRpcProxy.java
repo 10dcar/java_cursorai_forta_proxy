@@ -62,6 +62,7 @@ public class JsonRpcProxy {
                 
                 // Parse the JSON-RPC request to get method and params for cache key
                 JsonNode jsonRequest = objectMapper.readTree(requestBody);
+                System.out.println("Received request: " + jsonRequest);
                 String cacheKey = generateCacheKey(jsonRequest);
                 
                 // Try to get from cache
