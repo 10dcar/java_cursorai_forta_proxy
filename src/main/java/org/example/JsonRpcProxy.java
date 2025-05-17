@@ -62,7 +62,7 @@ public class JsonRpcProxy {
                 
                 // Parse the JSON-RPC request to get method and params for cache key
                 JsonNode jsonRequest = objectMapper.readTree(requestBody);
-                System.out.println("Received request: " + jsonRequest);
+                //System.out.println("Received request: " + jsonRequest);
                 String cacheKey = generateCacheKey(jsonRequest);
                 
                 // Try to get from cache
@@ -112,7 +112,7 @@ public class JsonRpcProxy {
         private String generateCacheKey(JsonNode jsonRequest) {
             // Create cache key from method and params
             String method = jsonRequest.get("method").asText();
-            JsonNode params = jsonRequest.get("params");
+            JsonNode params = jsonRequest.path("params");
             return method + "-" + params.toString();
         }
     }
