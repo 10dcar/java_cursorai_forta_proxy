@@ -20,6 +20,7 @@ import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class JsonRpcProxy {
@@ -67,6 +68,18 @@ public class JsonRpcProxy {
             }
 
             executorService.shutdown();
+            try {
+                if (!executorService.awaitTermination(10, TimeUnit.SECONDS)) {
+                    System.out.println("Executor did not terminate in time. Forcing shutdown...");
+                    executorService.shutdownNow();
+                    if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
+                        System.out.println("Executor did not terminate after forced shutdown.");
+                    }
+                }
+            } catch (InterruptedException ie) {
+                executorService.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
             System.out.println("Executor service shut down.");
 
             System.out.println("Cleanup completed successfully.");
