@@ -22,20 +22,19 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-//curl -X POST 127.0.0.1:8080  -d "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"eth_blockNumber\",\"params\":[]}"
 public class JsonRpcProxy {
     private static final int PORT = 8080;
     private static final List<String> UPSTREAM_URLS = Arrays.asList(
             "https://optimism-mainnet.blastapi.io/ef55e341-ee73-4566-9c05-b4a0d09b6045",
             "https://optimism-mainnet.blastapi.io/b699a618-d878-4223-ab41-27fef4856223"
     );
-    
+
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final AtomicInteger requestCounter = new AtomicInteger(0);
     private static final CloseableHttpClient httpClient = HttpClients.createDefault();
     private static java.util.concurrent.ExecutorService executorService;
 
-    // Cache configuration: 1000 entries, 5 minutes expiration
+    // Cache configuration: 1000 entries, 1 second expiration
     private static final Cache<String, String> responseCache = Caffeine.newBuilder()
             .maximumSize(1000)
             .expireAfterWrite(Duration.ofSeconds(1))
@@ -46,7 +45,7 @@ public class JsonRpcProxy {
         server.createContext("/", new JsonRpcHandler());
 
         executorService = java.util.concurrent.Executors.newFixedThreadPool(10);
-        server.setExecutor(executorService); // Set executor BEFORE start
+        server.setExecutor(executorService);
 
         server.start();
 
@@ -85,30 +84,20 @@ public class JsonRpcProxy {
                     return;
                 }
 
-                // Read the request body
                 String requestBody = new String(exchange.getRequestBody().readAllBytes());
-                
-                // Parse the JSON-RPC request to get method and params for cache key
                 JsonNode jsonRequest = objectMapper.readTree(requestBody);
-                //System.out.println("Received request: " + jsonRequest);
                 String cacheKey = generateCacheKey(jsonRequest);
-                
-                // Try to get from cache
+
                 String cachedResponse = responseCache.getIfPresent(cacheKey);
                 if (cachedResponse != null) {
                     sendResponse(exchange, 200, cachedResponse);
                     return;
                 }
 
-                // Forward request to upstream server with load balancing
                 String response = forwardRequest(requestBody);
-                
-                // Cache the response
                 responseCache.put(cacheKey, response);
-                
-                // Send response back to client
                 sendResponse(exchange, 200, response);
-                
+
             } catch (Exception e) {
                 e.printStackTrace();
                 sendResponse(exchange, 500, "{\"error\": {\"code\": -32603, \"message\": \"Internal error\"}}");
@@ -116,17 +105,14 @@ public class JsonRpcProxy {
         }
 
         private String forwardRequest(String requestBody) throws IOException {
-            // Simple round-robin load balancing
             int serverIndex = requestCounter.getAndIncrement() % UPSTREAM_URLS.size();
             String targetUrl = UPSTREAM_URLS.get(serverIndex);
 
-            try (CloseableHttpClient client = HttpClients.createDefault()) {
-                HttpPost httpPost = new HttpPost(targetUrl);
-                httpPost.setEntity(new StringEntity(requestBody, ContentType.APPLICATION_JSON));
-                
-                return client.execute(httpPost, response -> 
+            HttpPost httpPost = new HttpPost(targetUrl);
+            httpPost.setEntity(new StringEntity(requestBody, ContentType.APPLICATION_JSON));
+
+            return httpClient.execute(httpPost, response ->
                     EntityUtils.toString(response.getEntity()));
-            }
         }
 
         private void sendResponse(HttpExchange exchange, int statusCode, String response) throws IOException {
@@ -138,10 +124,9 @@ public class JsonRpcProxy {
         }
 
         private String generateCacheKey(JsonNode jsonRequest) {
-            // Create cache key from method and params
             String method = jsonRequest.get("method").asText();
             JsonNode params = jsonRequest.path("params");
             return method + "-" + params.toString();
         }
     }
-} 
+}
