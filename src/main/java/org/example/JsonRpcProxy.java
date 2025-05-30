@@ -49,6 +49,7 @@ public class JsonRpcProxy {
         server.setExecutor(executorService);
 
         server.start();
+        System.out.println("Server started on port " + PORT);
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("Shutdown hook triggered. Cleaning up...");
@@ -83,9 +84,8 @@ public class JsonRpcProxy {
             System.out.println("Executor service shut down.");
 
             System.out.println("Cleanup completed successfully.");
+            System.exit(0);
         }));
-
-        System.out.println("Server started on port " + PORT);
     }
 
     static class JsonRpcHandler implements HttpHandler {
@@ -123,9 +123,7 @@ public class JsonRpcProxy {
 
             HttpPost httpPost = new HttpPost(targetUrl);
             httpPost.setEntity(new StringEntity(requestBody, ContentType.APPLICATION_JSON));
-
-            return httpClient.execute(httpPost, response ->
-                    EntityUtils.toString(response.getEntity()));
+            return httpClient.execute(httpPost, response -> EntityUtils.toString(response.getEntity()));
         }
 
         private void sendResponse(HttpExchange exchange, int statusCode, String response) throws IOException {
