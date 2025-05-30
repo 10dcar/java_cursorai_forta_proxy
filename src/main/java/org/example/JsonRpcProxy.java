@@ -13,6 +13,7 @@ import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
+import sun.misc.Signal;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -34,40 +35,33 @@ public class JsonRpcProxy {
     private static final AtomicInteger requestCounter = new AtomicInteger(0);
     private static final CloseableHttpClient httpClient = HttpClients.createDefault();
     private static java.util.concurrent.ExecutorService executorService;
+    private static HttpServer server;
 
-    // Cache configuration: 1000 entries, 1 second expiration
     private static final Cache<String, String> responseCache = Caffeine.newBuilder()
             .maximumSize(1000)
             .expireAfterWrite(Duration.ofSeconds(1))
             .build();
 
-    public static void main(String[] args) throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress(PORT), 0);
-        server.createContext("/", new JsonRpcHandler());
+    private static void cleanup() {
+        System.out.println("Shutdown triggered. Cleaning up...");
 
-        executorService = java.util.concurrent.Executors.newFixedThreadPool(10);
-        server.setExecutor(executorService);
-
-        server.start();
-        System.out.println("Server started on port " + PORT);
-
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("Shutdown hook triggered. Cleaning up...");
-
+        if (server != null) {
             server.stop(0);
             System.out.println("HTTP server stopped.");
+        }
 
-            responseCache.invalidateAll();
-            System.out.println("Cache cleared.");
+        responseCache.invalidateAll();
+        System.out.println("Cache cleared.");
 
-            try {
-                httpClient.close();
-                System.out.println("HTTP client closed.");
-            } catch (IOException e) {
-                System.err.println("Error closing HTTP client: " + e.getMessage());
-                e.printStackTrace();
-            }
+        try {
+            httpClient.close();
+            System.out.println("HTTP client closed.");
+        } catch (IOException e) {
+            System.err.println("Error closing HTTP client: " + e.getMessage());
+            e.printStackTrace();
+        }
 
+        if (executorService != null) {
             executorService.shutdown();
             try {
                 if (!executorService.awaitTermination(10, TimeUnit.SECONDS)) {
@@ -82,10 +76,28 @@ public class JsonRpcProxy {
                 Thread.currentThread().interrupt();
             }
             System.out.println("Executor service shut down.");
+        }
 
-            System.out.println("Cleanup completed successfully.");
-            System.exit(0);
-        }));
+        System.out.println("Cleanup completed successfully.");
+        System.exit(0);
+    }
+
+    public static void main(String[] args) throws IOException {
+        // Register signal handlers
+        Signal.handle(new Signal("TERM"), signal -> cleanup());
+        Signal.handle(new Signal("INT"), signal -> cleanup());
+
+        server = HttpServer.create(new InetSocketAddress(PORT), 0);
+        server.createContext("/", new JsonRpcHandler());
+
+        executorService = java.util.concurrent.Executors.newFixedThreadPool(10);
+        server.setExecutor(executorService);
+
+        server.start();
+        System.out.println("Server started on port " + PORT);
+
+        // Also keep the shutdown hook as a fallback
+        Runtime.getRuntime().addShutdownHook(new Thread(JsonRpcProxy::cleanup));
     }
 
     static class JsonRpcHandler implements HttpHandler {
