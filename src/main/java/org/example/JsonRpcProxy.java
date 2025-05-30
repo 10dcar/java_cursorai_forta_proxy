@@ -32,7 +32,9 @@ public class JsonRpcProxy {
     
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final AtomicInteger requestCounter = new AtomicInteger(0);
-    
+    private static final CloseableHttpClient httpClient = HttpClients.createDefault();
+    private static java.util.concurrent.ExecutorService executorService;
+
     // Cache configuration: 1000 entries, 5 minutes expiration
     private static final Cache<String, String> responseCache = Caffeine.newBuilder()
             .maximumSize(1000)
@@ -40,11 +42,37 @@ public class JsonRpcProxy {
             .build();
 
     public static void main(String[] args) throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress(PORT), 0);//proxy
+        HttpServer server = HttpServer.create(new InetSocketAddress(PORT), 0);
         server.createContext("/", new JsonRpcHandler());
-        server.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(10));
+
+        executorService = java.util.concurrent.Executors.newFixedThreadPool(10);
+        server.setExecutor(executorService); // Set executor BEFORE start
+
         server.start();
-        
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("Shutdown hook triggered. Cleaning up...");
+
+            server.stop(0);
+            System.out.println("HTTP server stopped.");
+
+            responseCache.invalidateAll();
+            System.out.println("Cache cleared.");
+
+            try {
+                httpClient.close();
+                System.out.println("HTTP client closed.");
+            } catch (IOException e) {
+                System.err.println("Error closing HTTP client: " + e.getMessage());
+                e.printStackTrace();
+            }
+
+            executorService.shutdown();
+            System.out.println("Executor service shut down.");
+
+            System.out.println("Cleanup completed successfully.");
+        }));
+
         System.out.println("Server started on port " + PORT);
     }
 
