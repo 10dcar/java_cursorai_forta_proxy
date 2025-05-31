@@ -83,6 +83,9 @@ public class JsonRpcProxy {
     }
 
     public static void main(String[] args) throws IOException {
+        // Also keep the shutdown hook as a fallback
+        //Runtime.getRuntime().addShutdownHook(new Thread(JsonRpcProxy::cleanup));
+
         // Register signal handlers
         Signal.handle(new Signal("TERM"), signal -> cleanup());
         Signal.handle(new Signal("INT"), signal -> cleanup());
@@ -95,9 +98,6 @@ public class JsonRpcProxy {
 
         server.start();
         System.out.println("Server started on port " + PORT);
-
-        // Also keep the shutdown hook as a fallback
-        Runtime.getRuntime().addShutdownHook(new Thread(JsonRpcProxy::cleanup));
     }
 
     static class JsonRpcHandler implements HttpHandler {
