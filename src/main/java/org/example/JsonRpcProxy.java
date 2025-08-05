@@ -27,8 +27,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class JsonRpcProxy {
     private static final int PORT = 8080;
     private static final List<String> UPSTREAM_URLS = Arrays.asList(
-            //"https://optimism-mainnet.blastapi.io/ef55e341-ee73-4566-9c05-b4a0d09b6045",
-            //"https://optimism-mainnet.blastapi.io/b699a618-d878-4223-ab41-27fef4856223",
+            "https://optimism-mainnet.blastapi.io/ef55e341-ee73-4566-9c05-b4a0d09b6045",
+            "https://optimism-mainnet.blastapi.io/b699a618-d878-4223-ab41-27fef4856223",
             "https://optimism-mainnet.blastapi.io/a10481a0-039a-4773-bb2f-c18965ec2e0e",
             "https://optimism-mainnet.blastapi.io/1c14f13c-6f6f-4df7-88e6-334b439ebafb"
     );
